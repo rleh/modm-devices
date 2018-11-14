@@ -7,12 +7,14 @@ import os
 import re
 import logging
 from collections import defaultdict
+import networkx as nx
 
 from ..device_tree import DeviceTree
 from ..input.xml import XMLReader
 
 from .stm_header import STMHeader
 from .stm_identifier import STMIdentifier
+from .stm_clock import STMClock
 from . import stm
 from . import stm_peripherals
 
@@ -40,6 +42,10 @@ class STMDeviceTree:
                     devices.add(name[:12] + value + name[13:])
         return sorted(list(devices))
 
+    def getIpFile(device_file, peripheral):
+        ip_file = device_file.query('//IP[@Name="{}"]'.format(peripheral))[0].get("Version")
+        ip_file = os.path.join(STMDeviceTree.rootpath, "IP", "{}-{}_Modes.xml".format(peripheral, ip_file))
+        return XMLReader(ip_file)
 
     @staticmethod
     def getDevicesFromFamily(family):
@@ -67,6 +73,10 @@ class STMDeviceTree:
         p["id"] = did
 
         LOGGER.info("Parsing '{}'".format(did.string))
+
+        rccFile = STMDeviceTree.getIpFile(device_file, "RCC")
+        clock = STMClock.get(did, rccFile)
+        return None
 
         # information about the core and architecture
         core = device_file.query('//Core')[0].text.lower().replace("arm ", "")
@@ -210,9 +220,8 @@ class STMDeviceTree:
         p["flash_latency"] = stm.getFlashLatencyForDevice(did)
 
         # lets load additional information about the GPIO IP
-        ip_file = device_file.query('//IP[@Name="GPIO"]')[0].get("Version")
-        ip_file = os.path.join(STMDeviceTree.rootpath, "IP", "GPIO-" + ip_file + "_Modes.xml")
-        gpioFile = XMLReader(ip_file)
+        gpioFile = STMDeviceTree.getIpFile(device_file, "GPIO")
+
 
         pins = device_file.query('//Pin[@Type="I/O"][starts-with(@Name,"P")]')
         def raw_pin_sort(p):
