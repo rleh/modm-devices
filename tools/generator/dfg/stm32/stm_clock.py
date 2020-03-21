@@ -37,11 +37,17 @@ class STMClock:
         self.did = did
 
         match = basename(self.ip_file.filename)
-        match = re.search(r"RCC-STM32(((..).?.?)E?)[_-]rcc", match)
-        ip_name = match.group(1)
-        rcc_name = match.group(2)
-        family = match.group(3)
-        # print(family, rcc_name, ip_name)
+        #print(match)
+        if re.search(r"RCC-STM32W_rcc", match):
+            ip_name = "W"
+            rcc_name = "W"
+            family = "W"
+        else:
+            match = re.search(r"RCC-STM32(((..).?.?)E?)(_64)?[_-]rcc", match)
+            ip_name = match.group(1)
+            rcc_name = match.group(2)
+            family = match.group(3)
+        #print(family, rcc_name, ip_name)
         files = [c for c in STMClock.CLOCK_FILE_PATH.glob("*.xml") if str(c).endswith("{}.xml".format(rcc_name))]
         if not files:
             files = [c for c in STMClock.CLOCK_FILE_PATH.glob("*.xml") if rcc_name in str(c)]
