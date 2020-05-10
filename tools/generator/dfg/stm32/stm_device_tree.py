@@ -8,6 +8,7 @@ import re
 import logging
 from collections import defaultdict
 import networkx as nx
+from anytree import Node, RenderTree
 
 from ..device_tree import DeviceTree
 from ..input.xml import XMLReader
@@ -76,6 +77,73 @@ class STMDeviceTree:
 
         rccFile = STMDeviceTree.getIpFile(device_file, "RCC")
         clock = STMClock.get(did, rccFile)
+
+        tree_nodes = {}
+
+        for k, v in clock.ips.items():
+            if v.attrib['id'] not in tree_nodes:
+                parent = Node(str(v.attrib['id']))
+                tree_nodes[v.attrib['id']] = parent
+            else:
+                parent = tree_nodes[v.attrib['id']]
+            node = Node(str(k), parent=parent)
+            tree_nodes[k] = node
+
+            #print("IP: {}".format(k))
+            #print(" Clock source: {}".format(v.attrib['id']))
+
+        junk = list()
+
+        old_len = -1
+        for _ in range(5):
+            print("Loop")
+            first_nodes = [v for k, v in tree_nodes.items() if v.parent == None]
+
+            for first_node in first_nodes:
+                for pre, _, node in RenderTree(first_node):
+                    print("%s%s" % (pre, node.name))
+                print()
+
+            for n in first_nodes:
+                #print(n.name)
+                for k, e in clock.edges.items():
+                    # if e.get("from") is not None:
+                    #     print("Hooray!!!!", e.get("from"))
+                    # if str(e.get("from")) is str(n.name):
+                    #     print("Hooray!", e, ".from ==", n.name)
+                    # if str(e.get("signalId")) is str(n.name):
+                    #     print("Hooray!", e, ".signalId ==", n.name)
+
+                    if str(k).find("APB1PeriphClock->Tim") >= 0:
+                        junk.append({k: e})
+                        breakpoint()
+
+                    #if ("->{}".format(n.name) in e) or ("{}<-".format(n.name) in e):
+                    if str(k).find(n.name) >= 0:
+                        #print(e)
+                        if str(k).find("->{}".format(n.name)) >= 0:
+                            parent_name = str(k).split("->",1)[0]
+                        elif str(k).find("{}<-".format(n.name)) >= 0:
+                            parent_name = str(k).split("<-",1)[1]
+                        else:
+                            print("Error:", str(k))
+                            break
+                        if parent_name not in tree_nodes:
+                            parent = Node(str(parent_name))
+                            tree_nodes[parent_name] = parent
+                            print("New parent:", parent_name, "of", n.name)
+                        else:
+                            parent = tree_nodes[parent_name]
+                        n.parent = parent
+
+        first_nodes = [v for k, v in tree_nodes.items() if v.parent == None]
+        for first_node in first_nodes:
+            for pre, _, node in RenderTree(first_node):
+                print("%s%s" % (pre, node.name))
+            print()
+
+        print(junk)
+        exit(1)
         return None
 
         # information about the core and architecture
